@@ -4,80 +4,71 @@ import json
 
 # Your Bytez API configuration
 API_KEY = "b9789078ba3b4414cc4e24295ac921d7"
-API_URL = "https://api.bytez.com/chat/completions"  # Corrected endpoint
 
 def get_baby_names(country, gender):
-    """Get baby names using Qwen3-4B via Bytez API"""
-    prompt = f"Generate exactly 15 {gender} baby names from {country}. Return only the names separated by commas, no numbers, no explanations, no additional text."
+    """Get baby names using Bytez API with exact JS SDK format"""
     
+    # Based on your JavaScript example structure
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
     
+    # Try the exact format from Bytez documentation
     data = {
-        "model": "Qwen/Qwen3-4B-Instruct-2507",  # Model specified in the request body
+        "model": "Qwen/Qwen3-4B-Instruct-2507",
         "messages": [
             {
-                "role": "user",
-                "content": prompt
+                "role": "user", 
+                "content": f"Generate exactly 15 {gender} baby names from {country}. Only names separated by commas, no explanations."
             }
         ],
         "temperature": 0.7,
         "max_tokens": 200
     }
     
-    try:
-        response = requests.post(API_URL, headers=headers, json=data)
-        
-        # Print debug info
-        print(f"Status Code: {response.status_code}")
-        print(f"Response Headers: {response.headers}")
-        
-        if response.status_code != 200:
-            return f"API Error: {response.status_code} - {response.text}"
-        
-        result = response.json()
-        print(f"Full Response: {result}")
-        
-        # Extract the content from the response
-        if 'choices' in result and len(result['choices']) > 0:
-            names = result['choices'][0]['message']['content'].strip()
-            return names
-        else:
-            return "Error: Unexpected response format"
+    # Try different possible endpoints
+    endpoints = [
+        "https://api.bytez.com/chat/completions",
+        "https://api.bytez.com/v1/chat/completions",
+        "https://api.bytez.com/models/run"
+    ]
+    
+    for endpoint in endpoints:
+        try:
+            st.info(f"Trying endpoint: {endpoint}")
+            response = requests.post(endpoint, headers=headers, json=data, timeout=30)
             
-    except Exception as e:
-        return f"Error: {str(e)}"
+            if response.status_code == 200:
+                result = response.json()
+                if 'choices' in result:
+                    names = result['choices'][0]['message']['content'].strip()
+                    return names
+            else:
+                st.write(f"Endpoint {endpoint} failed: {response.status_code}")
+                continue
+                
+        except Exception as e:
+            st.write(f"Endpoint {endpoint} error: {str(e)}")
+            continue
+    
+    return "Error: All endpoints failed. Please check the API documentation."
 
 # Streamlit UI
-st.title("🌍 Baby Name Generator - Qwen3-4B")
-st.write("Discover beautiful baby names from around the world using Bytez API!")
+st.title("🌍 Baby Name Generator")
+st.write("Using Bytez API with Qwen3-4B-Instruct-2507")
 
-# Input fields
 country = st.text_input("Enter country:")
 gender = st.selectbox("Select gender:", ["boy", "girl"])
 
-if st.button("Generate Names"):
+if st.button("Generate 15 Names"):
     if country and gender:
-        with st.spinner("Finding beautiful names..."):
-            names = get_baby_names(country, gender)
+        result = get_baby_names(country, gender)
         
-        if not names.startswith("Error") and not names.startswith("API Error"):
-            st.success("Here are 15 names:")
-            
-            # Clean up the response
-            import re
-            cleaned_names = re.sub(r'\d+\.', '', names)  # Remove numbers like "1."
-            cleaned_names = re.sub(r'[-•]', '', cleaned_names)  # Remove bullets
-            cleaned_names = ' '.join(cleaned_names.split())  # Remove extra whitespace
-            
-            st.text_area("Generated Names:", cleaned_names, height=150)
+        if not result.startswith("Error"):
+            st.success(f"15 {gender} names from {country}:")
+            st.text_area("Names:", result, height=200)
         else:
-            st.error(names)
-            
-        # Show debug info
-        with st.expander("Debug Info"):
-            st.write("Response:", names)
+            st.error(result)
     else:
         st.warning("Please enter both country and gender!")
