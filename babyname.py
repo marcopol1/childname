@@ -1,26 +1,21 @@
 import streamlit as st
 import requests
 import json
-import os
 
-# Better approach - set API key as environment variable or use secrets
-# For local testing, you can set: export QWEN_API_KEY="your_key_here"
-API_KEY = os.getenv('QWEN_API_KEY', 'b9789078ba3b4414cc4e24295ac921d7')
-API_URL = "https://api.openrouter.ai/api/v1/chat/completions"
+# Your Bytez API configuration
+API_KEY = "b9789078ba3b4414cc4e24295ac921d7"
+API_URL = "https://api.bytez.com/models/Qwen/Qwen3-4B-Instruct-2507/chat/completions"
 
 def get_baby_names(country, gender):
-    """Get baby names using Qwen3-4B via API"""
+    """Get baby names using Qwen3-4B via Bytez API"""
     prompt = f"Generate exactly 15 {gender} baby names from {country}. Return only the names separated by commas, no numbers, no explanations, no additional text."
     
     headers = {
         "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://your-site.com",  # Required by OpenRouter
-        "X-Title": "Baby Name Generator"  # Required by OpenRouter
+        "Content-Type": "application/json"
     }
     
     data = {
-        "model": "qwen/qwen-3-4b-instruct-2507",
         "messages": [
             {
                 "role": "user",
@@ -36,19 +31,27 @@ def get_baby_names(country, gender):
         response.raise_for_status()
         
         result = response.json()
-        names = result['choices'][0]['message']['content'].strip()
-        return names
+        
+        # Extract the content from the response
+        # Based on Bytez API structure
+        if 'choices' in result and len(result['choices']) > 0:
+            names = result['choices'][0]['message']['content'].strip()
+            return names
+        else:
+            return "Error: Unexpected response format"
+            
     except requests.exceptions.RequestException as e:
         return f"API Error: {str(e)}"
     except KeyError:
-        return "Error: Unexpected response format from API"
+        return "Error: Could not extract names from response"
     except Exception as e:
         return f"Unexpected error: {str(e)}"
 
 # Streamlit UI
 st.title("🌍 Baby Name Generator - Qwen3-4B")
-st.write("Discover beautiful baby names from around the world!")
+st.write("Discover beautiful baby names from around the world using Bytez API!")
 
+# Input fields
 country = st.text_input("Enter country:")
 gender = st.selectbox("Select gender:", ["boy", "girl"])
 
@@ -59,14 +62,26 @@ if st.button("Generate Names"):
         
         if not names.startswith("Error"):
             st.success("Here are 15 names:")
-            # Clean the response
-            cleaned_names = ' '.join(names.split())  # Remove extra whitespace
-            st.text_area("Names:", cleaned_names, height=150)
+            
+            # Clean up the response
+            # Remove any numbers, bullets, or extra formatting
+            import re
+            cleaned_names = re.sub(r'\d+\.', '', names)  # Remove numbers like "1."
+            cleaned_names = re.sub(r'[-•]', '', cleaned_names)  # Remove bullets
+            cleaned_names = ' '.join(cleaned_names.split())  # Remove extra whitespace
+            
+            st.text_area("Generated Names:", cleaned_names, height=150)
             
             # Show raw response for debugging
             with st.expander("Debug - Raw Response"):
-                st.write(names)
+                st.json(names)
         else:
             st.error(names)
     else:
         st.warning("Please enter both country and gender!")
+
+# Add some info about the API
+st.sidebar.markdown("### API Info")
+st.sidebar.write(f"Using: Bytez API")
+st.sidebar.write(f"Model: Qwen3-4B-Instruct-2507")
+st.sidebar.write("Make sure your API key has sufficient credits!")
